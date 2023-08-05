@@ -2,12 +2,16 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from urllib.parse import urlparse, parse_qs
+from datetime import datetime
+import schedule
+import time
 
 
 
 # 실제 유저가 접속하는 것처럼 보이게 하기 위해 options 사용
 options = Options()
 options.add_argument("authority="+"www.coupang.com")
+# options.add_argument('headless')
 options.add_argument("method=" + "GET")
 options.add_argument("accept=" + "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
 options.add_argument("accept-encoding=" + "gzip, deflate, br")
@@ -15,58 +19,65 @@ options.add_argument("user-agent=" + "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_
 options.add_argument("sec-ch-ua-platform=" + "macOS")
 options.add_argument("cookie=" + "PCID=31489593180081104183684; _fbp=fb.1.1644931520418.1544640325; gd1=Y; X-CP-PT-locale=ko_KR; MARKETID=31489593180081104183684; sid=03ae1c0ed61946c19e760cf1a3d9317d808aca8b; x-coupang-origin-region=KOREA; x-coupang-target-market=KR; x-coupang-accept-language=ko_KR;")
 
-# 제품 이름을 매개변수로 받아 가장 첫 번째로 뜨는 상품의 제목과 가격, 링크를 리스트로 반환하는 함수
-def find_product_by_name(search_query):
-    driver = webdriver.Chrome(options=options)
-    driver.get(f"https://www.coupang.com/np/search?q={search_query}")
-    product_name = driver.find_element(By.CLASS_NAME, "name")
-    product_price = driver.find_element(By.CLASS_NAME, "price")
-    product_link = driver.find_element(By.CLASS_NAME, "search-product-link")
-
-    return [product_name.text, product_price.text, product_link.text]
-
-# 제품 이름을 매개변수로 받아 가장 첫 번쨰로 뜨는 제품의 product_number를 반환하는 함수
-def get_item_id(search_query):
-    driver = webdriver.Chrome(options=options)
-    driver.get(f"https://www.coupang.com/np/search?q={search_query}")
-    product_link = driver.find_element(By.CLASS_NAME, "search-product-link").get_property("href")
-    item_id = parse_qs(urlparse(product_link).query)['itemId'][0]
-    return item_id
-
-# 제품 이름을 매개변수로 받아 광고를 제외한 첫 번쨰로 뜨는 제품의 product number를 반환하는 함수
-def get_product_num(product_name):
-    driver = webdriver.Chrome(options=options)
-    driver.get(f"https://www.coupang.com/np/search?q={product_name}")
-    products = driver.find_elements(By.CLASS_NAME, "search-product-link")
-
+# selenium 파싱 결과 객체를 받아 첫 번째 요소가 광고 상품이면 두 번째 요소를 반환하고
+# 첫 번째 요소가 일반 상품이면 첫 번째 요소를 반혼하는 함수
+def ad_checker(products):
     try:
         ad_check = products[0].find_element(By.CLASS_NAME, "ad-badge ad-position-D")
-        product = products[0]
+        return products[0]
     except:
-        product = products[1]
+        return products[1]
 
-    product_num = product.get_attribute('href').split('/')[-1].split('?')[0]
-    return product_num
+# 제품 이름을 매개변수로 받아 해당 상품의 URL을 String으로 반환하는 함수
+def get_product_url(product_name):
+    driver = webdriver.Chrome(options=options)
+    driver.get(f"https://www.coupang.com/np/search?q={product_name}")
+    product_link_list = driver.find_elements(By.CLASS_NAME, "search-product-link")
+    product = ad_checker(product_link_list)
+    product_link = product.get_attribute("href")
+    return product_link
 
-# 제품 이름을 매개변수로 받아 해당 쿠팡 제품의 주소를 문자열로 반환하는 함수
-def gen_link(product_num):
-    return f"https://www.coupang.com/vp/products/{product_num}"
+# driver와 파싱을 원하는 요소의 class_name을 매개변수로 받음
+# class_name으로 요소를 찾는데 없는 경우에 에러를 일으키므로 try-except문 사용
+# 해당 요소가 있을 경우 요소의 텍스트를 반환하고 없으면 None을 반환함
+def get_element_text(driver, class_name):
+    try:
+        element_text = driver.find_element(By.CLASS_NAME, class_name).text
+        return element_text
+    except:
+        return None
 
-# 제품 이름을 매개변수로 받아 해당 상품의 가격 정보를 딕셔너리로 반환하는 함수
-def get_product_price(product_name):
-    url = gen_link(get_product_num(product_name))
+# 제품의 이름을 매개변수로 받으면 제품의 가격 정보와 조회 정보를 딕셔너리로 반환하는 함수
+def get_product_info(product_name):
+    url = get_product_url(product_name)
     driver = webdriver.Chrome(options=options)
     driver.get(url)
-    product_price_div = driver.find_element(By.CLASS_NAME, "prod-price")
-    origin_price = product_price_div.find_element(By.CLASS_NAME, "origin-price").text
-    discount_rate = product_price_div.find_element(By.CLASS_NAME, "discount-rate").text
-    total_price = product_price_div.find_element(By.CLASS_NAME, "total-price").text
+    print(url)
 
-    product_price = {"origin_price" : origin_price, "discount_rate" : discount_rate, "total_price" : total_price}
+    request_time = datetime.now()
+    product_real_name = driver.find_element(By.CLASS_NAME, "prod-buy-header__title").text
+    product_price_div = driver.find_element(By.CLASS_NAME, "prod-price")
+    origin_price = get_element_text(product_price_div, "origin-price")
+    discount_rate = get_element_text(product_price_div, "discount-rate")
+    total_price = get_element_text(product_price_div, "total-price")
+
+    product_price = {"product_name": product_real_name, "request_time": request_time, "origin_price": origin_price,
+                     "discount_rate": discount_rate, "total_price": total_price}
     return product_price
 
-print(get_product_price("맥북에어 13 M1"))
+# 기능 테스트 및 처리 시간 측정
+def test(list):
+    res = []
+    for i in list:
+        price_info = get_product_info(i)
+        print(price_info)
+        res.append(price_info)
+    return res
 
+test_list = ["갤럭시 s23", "아이패드 미니", "맥북프로 14", "아이패드 프로", "맥스튜디오", "에어팟 맥스"]
 
+start = time.time()
+test(test_list)
+print(time.time() - start)
 
 
