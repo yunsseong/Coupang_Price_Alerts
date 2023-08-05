@@ -37,6 +37,20 @@ def get_product_url(product_name):
     product_link = product.get_attribute("href")
     return product_link
 
+# 제품의 이름 리스트를 매개변수로 받아 제품의 url 리스트를 반환하는 함수
+def get_product_url_list(product_name_list):
+    product_url_list = []
+    for product_name in product_name_list:
+        product_url_list.append(get_product_url(product_name))
+    return product_url_list
+
+# 제품의 이름 url 리스트를 매개변수로 받아 제품의 가격 정보 리스트를 반환하는 함수
+def get_product_info_list(product_url_list):
+    product_info_list = []
+    for product_url in product_url_list:
+        product_info_list.append([get_product_info_through_url(product_url)])
+    return product_info_list
+
 # driver와 파싱을 원하는 요소의 class_name을 매개변수로 받음
 # class_name으로 요소를 찾는데 없는 경우에 에러를 일으키므로 try-except문 사용
 # 해당 요소가 있을 경우 요소의 텍스트를 반환하고 없으면 None을 반환함
@@ -47,13 +61,8 @@ def get_element_text(driver, class_name):
     except:
         return None
 
-# 제품의 이름을 매개변수로 받으면 제품의 가격 정보와 조회 정보를 딕셔너리로 반환하는 함수
-def get_product_info(product_name):
-    url = get_product_url(product_name)
-    driver = webdriver.Chrome(options=options)
-    driver.get(url)
-    print(url)
-
+# driver를 매개변수로 받아 제품 가격 정보와 조회 시간을 딕셔너리로 반환하는 함수
+def get_product_price(driver):
     request_time = datetime.now()
     product_real_name = driver.find_element(By.CLASS_NAME, "prod-buy-header__title").text
     product_price_div = driver.find_element(By.CLASS_NAME, "prod-price")
@@ -63,21 +72,18 @@ def get_product_info(product_name):
 
     product_price = {"product_name": product_real_name, "request_time": request_time, "origin_price": origin_price,
                      "discount_rate": discount_rate, "total_price": total_price}
+    print(product_price)
     return product_price
 
-# 기능 테스트 및 처리 시간 측정
-def test(list):
-    res = []
-    for i in list:
-        price_info = get_product_info(i)
-        print(price_info)
-        res.append(price_info)
-    return res
+# 제품의 이름을 매개변수로 받으면 제품의 가격 정보와 조회 정보를 딕셔너리로 반환하는 함수
+def get_product_info(product_name):
+    url = get_product_url(product_name)
+    driver = webdriver.Chrome(options=options)
+    driver.get(url)
+    return get_product_price(driver)
 
-test_list = ["갤럭시 s23", "아이패드 미니", "맥북프로 14", "아이패드 프로", "맥스튜디오", "에어팟 맥스"]
-
-start = time.time()
-test(test_list)
-print(time.time() - start)
-
-
+# 제품의 url을 매개변수로 받으면 제품의 가격 정보와 조회 정보를 딕셔너리로 반환하는 함수
+def get_product_info_through_url(product_url):
+    driver = webdriver.Chrome(options=options)
+    driver.get(product_url)
+    return get_product_price(driver)
