@@ -76,7 +76,7 @@ def get_product_price(driver):
     return product_price
 
 # 제품의 이름을 매개변수로 받으면 제품의 가격 정보와 조회 정보를 딕셔너리로 반환하는 함수
-def get_product_info(product_name):
+def get_product_by_name(product_name):
     url = get_product_url(product_name)
     driver = webdriver.Chrome(options=options)
     driver.get(url)
